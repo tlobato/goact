@@ -40,7 +40,18 @@ func main() {
 
 	fmt.Println("Go module setup:", project)
 	cmd = exec.Command("go", "get", "github.com/joho/godotenv")
-	cmd.Run()
+	cmd.Stderr = os.Stderr
+	cmd.Stdout = os.Stdout
+	if err := cmd.Run(); err != nil {
+		fmt.Println("Error:", err)
+	}
+
+	cmd = exec.Command("go", "install", "github.com/air-verse/air")
+
+	err = cmd.Run()
+	if err != nil {
+		fmt.Println("failed to install godotenv:", err)
+	}
 
 	//SETUP GO
 	os.Mkdir("./server", 0755)
@@ -129,6 +140,58 @@ func main() {
 		return
 	}
 
+	fmt.Printf("Use React Router? (Y/n): ")
+	useRR, _ := reader.ReadString('\n')
+	useRR = strings.TrimSpace(useRR)
+	if useRR == "n" {
+		os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+   <h1 className="text-2xl">Hello from Goact!</h1>
+  </StrictMode>,
+)`), 0644)
+	} else {
+		cmd = exec.Command(pkgManager, "install", "react-router@latest")
+		cmd.Dir = "./client"
+		err = cmd.Run()
+		if err != nil {
+			fmt.Println("failed to install react-router:", err)
+			return
+		}
+		os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+import { BrowserRouter, Link, Outlet, Route, Routes } from 'react-router'
+
+createRoot(document.getElementById('root')!).render(
+  <StrictMode>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={
+          <div className='flex h-screen'>
+            <aside className='h-full w-56 bg-zinc-900 text-white'>
+              <nav className='flex flex-col gap-1.5 p-2 text-lg'>
+                <Link to="/" className='w-full cursor-pointer hover:bg-zinc-700 rounded bg-zinc-800 p-1.5'>Home</Link>
+                <Link to="/about" className='w-full cursor-pointer hover:bg-zinc-700 rounded bg-zinc-800 p-1.5'>About</Link>
+                <Link to="/usage" className='w-full cursor-pointer hover:bg-zinc-700 rounded bg-zinc-800 p-1.5'>Usage</Link>
+              </nav>
+            </aside>
+            <Outlet />
+          </div>}>
+          <Route index element={<main className='bg-zinc-700 flex-1 text-white flex flex-col items-center pt-16'><h1 className='text-6xl font-extrabold'>Home</h1></main>} />
+          <Route path="/about" element={<main className='bg-zinc-700 flex-1 text-white flex flex-col items-center pt-16'><h1 className='text-6xl font-extrabold'>About</h1></main>} />
+          <Route path="/usage" element={<main className='bg-zinc-700 flex-1 text-white flex flex-col items-center pt-16'><h1 className='text-6xl font-extrabold'>Usage</h1></main>} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  </StrictMode>,
+)`), 0644)
+
+	}
+
 	fmt.Printf("Use Tailwind? (Y/n): ")
 	useTailwind, _ := reader.ReadString('\n')
 	useTailwind = strings.TrimSpace(useTailwind)
@@ -169,21 +232,12 @@ export default {
 	}
 
 	os.Remove("./client/src/App.css")
-	os.Remove("./client/src/assets")
+	os.RemoveAll("./client/src/assets")
 	os.Remove("./client/src/App.tsx")
-
-	os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-   <h1 className="text-2xl">Hello from Goact!</h1> 
-  </StrictMode>,
-)`), 0644)
 
 	cmd = exec.Command(pkgManager, "install")
 	cmd.Dir = "./client"
+	fmt.Println("Installing dependencies...")
 	err = cmd.Run()
 	if err != nil {
 		fmt.Println("failed to install dependencies:", err)

@@ -1,6 +1,6 @@
 ## Goact
 Best Go + React setup for web development.
-Featuring:
+#### Featuring:
 - Go's [Fiber](https://gofiber.io) library for easier routes and authentication.
 - [React Router](https://reactrouter.com) configured by default.
 - [Tailwind](https://tailwindcss.com) for easier styling.
@@ -10,4 +10,4 @@ Featuring:
 
 ## Usage
 - Clone the repo: `git clone https://github.com/tomaslobato/goact`
-- Use `go run .`, Go through the CLI and enjoy your personalized setup
+- Use `go run . [dir]`, Go through the CLI and enjoy your personalized setup

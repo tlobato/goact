@@ -9,7 +9,31 @@ import (
 )
 
 func main() {
-	//GO MODULE
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: go run . [dir]")
+		fmt.Println("`[dir]` refers to the folder you want your project to be, write it without brackets")
+		os.Exit(1)
+	}
+
+	folder := os.Args[1]
+	err := os.MkdirAll(folder, 0755)
+	if err != nil {
+		fmt.Println("Failed to create or access folder:", err)
+		os.Exit(1)
+	}
+
+	removingFiles := []string{"go.mod", "main.go", "readme.md", ".git"}
+	for _, file := range removingFiles {
+		os.RemoveAll(file)
+	}
+
+	err = os.Chdir(folder)
+	if err != nil {
+		fmt.Println("Failed to change directory:", err)
+		os.Exit(1)
+	}
+
+	//SETUP GO
 	fmt.Println("====== Goact ======")
 	fmt.Println("Setup your Go and React project with ease!")
 
@@ -32,59 +56,108 @@ func main() {
 
 	cmd := exec.Command("go", "mod", "init", project)
 
-	err := cmd.Run()
+	err = cmd.Run()
 	if err != nil {
-		fmt.Println("failed to create go.mod:", err)
+		fmt.Println("Failed to create go.mod:", err)
 		return
 	}
 
 	fmt.Println("Go module setup:", project)
 	cmd = exec.Command("go", "get", "github.com/joho/godotenv")
-	cmd.Stderr = os.Stderr
-	cmd.Stdout = os.Stdout
 	if err := cmd.Run(); err != nil {
 		fmt.Println("Error:", err)
 	}
 
 	cmd = exec.Command("go", "install", "github.com/air-verse/air")
-
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println("failed to install godotenv:", err)
+		fmt.Println("Failed to install godotenv:", err)
 	}
 
-	//SETUP GO
 	os.Mkdir("./server", 0755)
-	handlersFile := `
-	//Example code
-	package server
 
-	import (
+	fmt.Println("\nYou can choose fiber as a simpler way to setup your backend, if you want the standard library write n")
+	fmt.Print("Use Fiber? [Y/n]: ")
+	useFiber, _ := reader.ReadString('\n')
+	useFiber = strings.TrimSpace(useFiber)
+	if useFiber != "n" {
+		cmd = exec.Command("go", "get", "github.com/gofiber/fiber/v2")
+		if err = cmd.Run(); err != nil {
+			fmt.Println("Failed to install Fiber: ", err)
+		}
+		handlersFile := `package server
+
+import (
+	"github.com/gofiber/fiber/v2"
+)
+
+func HandleHello(c *fiber.Ctx) error {
+	return c.JSON(fiber.Map{"message": "hello!"})
+}`
+
+		os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
+
+		os.Remove("./main.go")
+		mainFile := fmt.Sprintf(`package main
+
+import (
+	"log"
+
+	"%s/server"
+
+	"github.com/joho/godotenv"
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+)
+
+func main() {
+	godotenv.Load(".env")
+
+	app := fiber.New()
+
+	//handle frontend routes
+	app.Static("/", "./client/dist")
+
+	api := app.Group("/api", cors.New(cors.Config{
+		AllowOrigins: "http://localhost:3000", //change this later
+		AllowMethods: "GET,POST,PUT,PATCH,DELETE",
+	}))
+	api.Get("/hello", server.HandleHello)
+
+	log.Fatal(app.Listen(":3000"))
+}
+`, project)
+		os.WriteFile("./main.go", []byte(mainFile), 0644)
+	} else {
+		handlersFile := `//Example code
+package server
+
+import (
 	"net/http"
 	"encoding/json"
-	)
+)
 
-	func ApiRoutes() {
-		http.HandleFunc("/api/hello", handleHello)
-	}
+func ApiRoutes() {
+	http.HandleFunc("/api/hello", handleHello)
+}
 
-	type HelloResponse struct {
-		Message string ` + "`json:\"message\"`" + `
-	}
+type HelloResponse struct {
+	Message string  + "json:\"message\"" +
+}
 
-	func handleHello(w http.ResponseWriter, r *http.Request) {
-		response := HelloResponse{Message: "Hello, World!"}
+func handleHello(w http.ResponseWriter, r *http.Request) {
+	response := HelloResponse{Message: "Hello, World!"}
 
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(response)
-	}`
-	os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(response)
+}`
+		os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
 
-	os.Remove("./main.go")
-	mainFile := fmt.Sprintf(`package main
+		os.Remove("./main.go")
+		mainFile := fmt.Sprintf(`package main
 
-	import (
+import (
 	"log"
 	"os"
 	"net/http"
@@ -92,26 +165,27 @@ func main() {
 
 	"%s/server"
 	"github.com/joho/godotenv"
-	)
+)
 
-	func main () {
-		godotenv.Load(".env")
+func main () {
+	godotenv.Load(".env")
 
-		//handle frontend routes
-		fs := http.FileServer(http.Dir("./client/dist/"))
-		http.Handle("/", fs)
+	//handle frontend routes
+	fs := http.FileServer(http.Dir("./client/dist/"))
+	http.Handle("/", fs)
 
-		server.ApiRoutes()
+	server.ApiRoutes()
 
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = ":3000"
-		}
-		fmt.Println("Server running on port", port)
-		fmt.Println("http://localhost:3000 - go to /api/hello to test the Go API")
-		log.Fatal(http.ListenAndServe(port, nil))
-	}`, project)
-	os.WriteFile("./main.go", []byte(mainFile), 0644)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = ":3000"
+	}
+	fmt.Println("Server running on port", port)
+	fmt.Println("http://localhost:3000 - go to /api/hello to test the Go API")
+	log.Fatal(http.ListenAndServe(port, nil))
+}`, project)
+		os.WriteFile("./main.go", []byte(mainFile), 0644)
+	}
 
 	cmd = exec.Command("air", "init")
 	err = cmd.Run()
@@ -121,19 +195,14 @@ func main() {
 
 	//SETUP FRONTEND
 	fmt.Println("\nFRONTEND SETUP")
-	fmt.Print("Your package manager (pnpm/bun): ")
+	fmt.Print("Your package manager (Pnpm/bun): ")
 	pkgManager, _ := reader.ReadString('\n')
 	pkgManager = strings.TrimSpace(pkgManager)
-
-	fmt.Print("Use TypeScript? (Y/n): ")
-	useTs, _ := reader.ReadString('\n')
-	useTs = strings.TrimSpace(useTs)
-
-	template := "react-ts"
-	if useTs == "n" {
-		template = "react"
+	if pkgManager != "pnpm" && pkgManager != "bun" {
+		pkgManager = "pnpm"
 	}
-	cmd = exec.Command(pkgManager, "create", "vite@latest", "./client", "--template", template)
+
+	cmd = exec.Command(pkgManager, "create", "vite@latest", "./client", "--template", "react-ts")
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
 		fmt.Println("failed to create vite app:", err)
@@ -188,7 +257,7 @@ createRoot(document.getElementById('root')!).render(
       </Routes>
     </BrowserRouter>
   </StrictMode>,
-)`), 0644)
+  )`), 0644)
 
 	}
 
@@ -231,6 +300,24 @@ export default {
 
 	}
 
+	viteConfig := `import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  css: {
+    postcss: './postcss.config.js',
+  },
+  server: {
+    proxy: {
+      "/api": {
+        target: 'http://localhost:3000',
+        changeOrigin: true
+      }
+    }
+  }
+})`
+	os.WriteFile("./client/vite.config.ts", []byte(viteConfig), 0644)
 	os.Remove("./client/src/App.css")
 	os.RemoveAll("./client/src/assets")
 	os.Remove("./client/src/App.tsx")
@@ -246,9 +333,4 @@ export default {
 
 	fmt.Println("Setup complete!")
 
-	fmt.Println("\n Use Guide:")
-	fmt.Println("1. To run the Go dev server: `air .`")
-	fmt.Printf("2. To run the React dev server: `cd client && %s run dev`\n", pkgManager)
-	fmt.Printf("3. To build frontend: `cd client && %s build`\n", pkgManager)
-	fmt.Printf("4. To run production: `cd client && %s build && cd .. && go run . \n", pkgManager)
 }

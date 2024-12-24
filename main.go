@@ -22,7 +22,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	removingFiles := []string{"go.mod", "main.go", "readme.md", ".git"}
+	removingFiles := []string{"go.mod", "main.go", "readme.md"}
 	for _, file := range removingFiles {
 		os.RemoveAll(file)
 	}

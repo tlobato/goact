@@ -9,7 +9,7 @@ Best Go + React setup for web development.
 - All in one deployment (Go serves the front-end in production).
 
 ## Usage
-- Clone the repo: `git clone https://github.com/tomaslobato/goact .`
+- Clone the repo: `git clone https://github.com/tlobato/goact`
 - Use `go run . [dir]`, Go through the CLI and enjoy your personalized setup
 ---
 - Dev server: `cd client && pnpm dev && cd .. && air .`<br/>

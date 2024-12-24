@@ -12,7 +12,7 @@ Best Go + React setup for web development.
 - Clone the repo: `git clone https://github.com/tomaslobato/goact`
 - Use `go run . [dir]`, Go through the CLI and enjoy your personalized setup
 ---
-- Dev server: `cd client && pnpm dev && cd .. && air .`\n
+- Dev server: `cd client && pnpm dev && cd .. && air .`<br/>
   It will automatically proxy API routes from port :3000 to :5173 through vite's proxy 
-- Production: `cd client && pnpm build && cd .. && go run .`\n
+- Production: `cd client && pnpm build && cd .. && go run .`<br/>
   Go serves the built app at client/dist

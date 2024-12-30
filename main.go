@@ -40,6 +40,8 @@ func main() {
 	fmt.Println("\nGO MODULE SETUP")
 	reader := bufio.NewReader(os.Stdin)
 
+	os.WriteFile("./.gitignore", []byte(".env\nnode_modules/\ndist/\n"), 0644)
+
 	fmt.Print("Enter your github.com account name: ")
 	account, _ := reader.ReadString('\n')
 	account = strings.TrimSpace(account)
@@ -49,13 +51,7 @@ func main() {
 	project = strings.TrimSpace(project)
 	project = fmt.Sprintf("github.com/%s/%s", account, project)
 
-	if err := os.Remove("./go.mod"); err != nil && !os.IsNotExist(err) {
-		fmt.Println("Failed to remove go.mod:", err)
-		return
-	}
-
 	cmd := exec.Command("go", "mod", "init", project)
-
 	err = cmd.Run()
 	if err != nil {
 		fmt.Println("Failed to create go.mod:", err)
@@ -68,14 +64,7 @@ func main() {
 		fmt.Println("Error:", err)
 	}
 
-	cmd = exec.Command("go", "install", "github.com/air-verse/air")
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("Failed to install godotenv:", err)
-	}
-
 	os.Mkdir("./server", 0755)
-
 	fmt.Println("\nYou can choose fiber as a simpler way to setup your backend, if you want the standard library write n")
 	fmt.Print("Use Fiber? [Y/n]: ")
 	useFiber, _ := reader.ReadString('\n')
@@ -88,43 +77,42 @@ func main() {
 		handlersFile := `package server
 
 import (
-	"github.com/gofiber/fiber/v2"
+		"github.com/gofiber/fiber/v2"
 )
 
 func HandleHello(c *fiber.Ctx) error {
-	return c.JSON(fiber.Map{"message": "hello!"})
+		return c.JSON(fiber.Map{"message": "hello!"})
 }`
 
 		os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
 
-		os.Remove("./main.go")
 		mainFile := fmt.Sprintf(`package main
 
 import (
-	"log"
+		"log"
 
-	"%s/server"
+		"%s/server"
 
-	"github.com/joho/godotenv"
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/cors"
+		"github.com/joho/godotenv"
+		"github.com/gofiber/fiber/v2"
+		"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
-	godotenv.Load(".env")
+		godotenv.Load(".env")
 
-	app := fiber.New()
+		app := fiber.New()
 
-	//handle frontend routes
-	app.Static("/", "./client/dist")
+		//handle frontend routes
+		app.Static("/", "./client/dist")
 
-	api := app.Group("/api", cors.New(cors.Config{
-		AllowOrigins: "http://localhost:3000", //change this later
-		AllowMethods: "GET,POST,PUT,PATCH,DELETE",
-	}))
-	api.Get("/hello", server.HandleHello)
+		api := app.Group("/api", cors.New(cors.Config{
+			AllowOrigins: "http://localhost:3000", //change this later
+			AllowMethods: "GET,POST,PUT,PATCH,DELETE",
+		}))
+		api.Get("/hello", server.HandleHello)
 
-	log.Fatal(app.Listen(":3000"))
+		log.Fatal(app.Listen(":3000"))
 }
 `, project)
 		os.WriteFile("./main.go", []byte(mainFile), 0644)
@@ -133,85 +121,72 @@ func main() {
 package server
 
 import (
-	"net/http"
-	"encoding/json"
+		"net/http"
+		"encoding/json"
 )
 
 func ApiRoutes() {
-	http.HandleFunc("/api/hello", handleHello)
+		http.HandleFunc("/api/hello", handleHello)
 }
 
 type HelloResponse struct {
-	Message string  + "json:\"message\"" +
+		Message string ` + "`json:`" + `"message"` + `
 }
 
 func handleHello(w http.ResponseWriter, r *http.Request) {
-	response := HelloResponse{Message: "Hello, World!"}
+		response := HelloResponse{Message: "Hello, World!"}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-	json.NewEncoder(w).Encode(response)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode(response)
 }`
 		os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
 
-		os.Remove("./main.go")
 		mainFile := fmt.Sprintf(`package main
 
 import (
-	"log"
-	"os"
-	"net/http"
-	"fmt"
+		"log"
+		"os"
+		"net/http"
+		"fmt"
 
-	"%s/server"
-	"github.com/joho/godotenv"
+		"%s/server"
+		"github.com/joho/godotenv"
 )
 
 func main () {
-	godotenv.Load(".env")
+		godotenv.Load(".env")
 
-	//handle frontend routes
-	fs := http.FileServer(http.Dir("./client/dist/"))
-	http.Handle("/", fs)
+		//handle frontend routes
+		fs := http.FileServer(http.Dir("./client/dist/"))
+		http.Handle("/", fs)
 
-	server.ApiRoutes()
+		server.ApiRoutes()
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = ":3000"
-	}
-	fmt.Println("Server running on port", port)
-	fmt.Println("http://localhost:3000 - go to /api/hello to test the Go API")
-	log.Fatal(http.ListenAndServe(port, nil))
+		port := os.Getenv("PORT")
+		if port == "" {
+			port = ":3000"
+		}
+		fmt.Println("Server running on port", port)
+		fmt.Println("http://localhost:3000 - go to /api/hello to test the Go API")
+		log.Fatal(http.ListenAndServe(port, nil))
 }`, project)
 		os.WriteFile("./main.go", []byte(mainFile), 0644)
 	}
 
-	cmd = exec.Command("air", "init")
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("failed to create air.toml:", err)
-	}
-
-	//SETUP FRONTEND
-	fmt.Println("\nFRONTEND SETUP")
-	fmt.Print("Your package manager (Pnpm/bun): ")
-	pkgManager, _ := reader.ReadString('\n')
-	pkgManager = strings.TrimSpace(pkgManager)
-	if pkgManager != "pnpm" && pkgManager != "bun" {
-		pkgManager = "pnpm"
-	}
-
-	cmd = exec.Command(pkgManager, "create", "vite@latest", "./client", "--template", "react-ts")
-	cmd.Stderr = os.Stderr
+	os.Mkdir("./client", 0755)
+	cmd = exec.Command("npm", "create", "vite@latest", ".", "--", "--template", "react-ts", "-y")
+	cmd.Dir = "./client"
 	if err := cmd.Run(); err != nil {
-		fmt.Println("failed to create vite app:", err)
+		fmt.Println("Failed to create Vite project:", err)
 		return
 	}
 
+	fmt.Println("\nFRONTEND SETUP")
 	fmt.Printf("Use React Router? (Y/n): ")
 	useRR, _ := reader.ReadString('\n')
 	useRR = strings.TrimSpace(useRR)
+
 	if useRR == "n" {
 		os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -223,13 +198,12 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 )`), 0644)
 	} else {
-		cmd = exec.Command(pkgManager, "install", "react-router@latest")
+		cmd = exec.Command("npm", "install", "react-router")
 		cmd.Dir = "./client"
-		err = cmd.Run()
-		if err != nil {
-			fmt.Println("failed to install react-router:", err)
-			return
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Failed to install React Router:", err)
 		}
+
 		os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
@@ -258,7 +232,6 @@ createRoot(document.getElementById('root')!).render(
     </BrowserRouter>
   </StrictMode>,
   )`), 0644)
-
 	}
 
 	fmt.Printf("Use Tailwind? (Y/n): ")
@@ -266,23 +239,18 @@ createRoot(document.getElementById('root')!).render(
 	useTailwind = strings.TrimSpace(useTailwind)
 
 	if useTailwind != "n" {
-		cmd = exec.Command(pkgManager, "install", "-D", "tailwindcss", "postcss", "autoprefixer")
+		cmd = exec.Command("npm", "install", "tailwindcss", "autoprefixer", "postcss")
 		cmd.Dir = "./client"
-		err = cmd.Run()
-		if err != nil {
-			fmt.Println("failed to install tailwind:", err)
-			return
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Failed to install Tailwind:", err)
+		}
+		cmd = exec.Command("npx", "tailwindcss", "init")
+		cmd.Dir = "./client"
+		if err := cmd.Run(); err != nil {
+			fmt.Println("Failed to init Tailwind:", err)
 		}
 
-		cmd = exec.Command("npx", "tailwindcss", "init", "-p")
-		cmd.Dir = "./client"
-		err = cmd.Run()
-		if err != nil {
-			fmt.Println("failed to install tailwind:", err)
-			return
-		}
-
-		os.WriteFile("./client/tailwind.config.js", []byte(`/** @type {import('tailwindcss').Config} */
+		tailwindConfig := `/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
@@ -292,12 +260,21 @@ export default {
     extend: {},
   },
   plugins: [],
-}`), 0644)
+}`
+		os.WriteFile("./client/tailwind.config.js", []byte(tailwindConfig), 0644)
 
-		os.WriteFile("./client/src/index.css", []byte(`@tailwind base;
+		postcssConfig := `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
+}`
+		os.WriteFile("./client/postcss.config.js", []byte(postcssConfig), 0644)
+
+		indexCSS := `@tailwind base;
 @tailwind components;
-@tailwind utilities;`), 0644)
-
+@tailwind utilities;`
+		os.WriteFile("./client/src/index.css", []byte(indexCSS), 0644)
 	}
 
 	viteConfig := `import { defineConfig } from 'vite'
@@ -305,9 +282,6 @@ import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
-  css: {
-    postcss: './postcss.config.js',
-  },
   server: {
     proxy: {
       "/api": {
@@ -317,20 +291,15 @@ export default defineConfig({
     }
   }
 })`
+
 	os.WriteFile("./client/vite.config.ts", []byte(viteConfig), 0644)
-	os.Remove("./client/src/App.css")
-	os.RemoveAll("./client/src/assets")
-	os.Remove("./client/src/App.tsx")
 
-	cmd = exec.Command(pkgManager, "install")
-	cmd.Dir = "./client"
-	fmt.Println("Installing dependencies...")
-	err = cmd.Run()
-	if err != nil {
-		fmt.Println("failed to install dependencies:", err)
-		return
-	}
+	fmt.Println("\nSetup complete!")
+	fmt.Println("\nNext steps:")
+	fmt.Printf("1. cd %s/client && npm install\n", folder)
 
-	fmt.Println("Setup complete!")
+	fmt.Println("2. Run Golang dev mode with `air` or `go run .`")
+	fmt.Println("3. And run Vite dev mode with `cd client && npm run dev`")
 
+	fmt.Println("Happy coding!")
 }

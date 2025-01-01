@@ -22,10 +22,10 @@ func main() {
 		os.Exit(1)
 	}
 
-	removingFiles := []string{"go.mod", "main.go", "readme.md"}
-	for _, file := range removingFiles {
-		os.RemoveAll(file)
-	}
+	// removingFiles := []string{"go.mod", "main.go", "readme.md"}
+	// for _, file := range removingFiles {
+	// 	os.RemoveAll(file)
+	// }
 
 	err = os.Chdir(folder)
 	if err != nil {
@@ -183,6 +183,10 @@ func main () {
 	}
 
 	fmt.Println("\nFRONTEND SETUP")
+	os.Remove("./client/src/App.tsx")
+	os.RemoveAll("./client/src/assets")
+	os.Remove("./client/src/App.css")
+	os.RemoveAll("./client/public")
 	fmt.Printf("Use React Router? (Y/n): ")
 	useRR, _ := reader.ReadString('\n')
 	useRR = strings.TrimSpace(useRR)
@@ -275,6 +279,8 @@ export default {
 @tailwind components;
 @tailwind utilities;`
 		os.WriteFile("./client/src/index.css", []byte(indexCSS), 0644)
+	} else {
+		os.WriteFile("./client/src/index.css", []byte(``), 0644)
 	}
 
 	viteConfig := `import { defineConfig } from 'vite'

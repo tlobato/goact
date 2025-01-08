@@ -80,7 +80,11 @@ func main() {
 		pm = "npm"
 	}
 
-	cmd = exec.Command(pm, "create", "vite@latest", "client", "--template", "react-ts")
+	if pm == "npm" {
+		cmd = exec.Command("npx", "create-vite@latest", "./client", "--template", "react-ts")
+	} else {
+		cmd = exec.Command(pm, "create", "vite@latest", "./client", "--template", "react-ts")
+	}
 	err = cmd.Run()
 	if err != nil {
 		fmt.Println("Error creating vite application:", err)
@@ -199,5 +203,4 @@ export default defineConfig({
 	fmt.Print("\n")
 
 	fmt.Println("Happy Coding!")
-
 }

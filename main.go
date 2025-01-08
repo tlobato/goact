@@ -24,10 +24,6 @@ func main() {
 
 	err := os.Mkdir(folder, 0755)
 	if err != nil {
-		if !os.IsExist(err) {
-			fmt.Println("Failed to create dir:", err)
-			return
-		}
 	}
 
 	fmt.Print("Use Fiber? [Y/n]: ")

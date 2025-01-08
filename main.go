@@ -6,255 +6,136 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+
+	"github.com/otiai10/copy"
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run . [dir]")
-		fmt.Println("`[dir]` refers to the folder you want your project to be, write it without brackets")
-		os.Exit(1)
-	}
-
-	folder := os.Args[1]
-	err := os.MkdirAll(folder, 0755)
-	if err != nil {
-		fmt.Println("Failed to create or access folder:", err)
-		os.Exit(1)
-	}
-
-	removingFiles := []string{"go.mod", "main.go", "readme.md"}
-	for _, file := range removingFiles {
-		os.RemoveAll(file)
-	}
-
-	err = os.Chdir(folder)
-	if err != nil {
-		fmt.Println("Failed to change directory:", err)
-		os.Exit(1)
-	}
-
-	//SETUP GO
-	fmt.Println("====== Goact ======")
-	fmt.Println("Setup your Go and React project with ease!")
-
-	fmt.Println("\nGO MODULE SETUP")
+	//GO
 	reader := bufio.NewReader(os.Stdin)
+	folder := "."
+	if len(os.Args) < 2 {
+		fmt.Print("Where will your project be?: (.) ")
+		folder, _ = reader.ReadString('\n')
+		folder = strings.TrimSpace(folder)
+	} else {
+		folder = os.Args[1]
+	}
 
-	os.WriteFile("./.gitignore", []byte(".env\nnode_modules/\ndist/\n"), 0644)
+	err := os.Mkdir(folder, 0755)
+	if err != nil {
+		if !os.IsExist(err) {
+			fmt.Println("Failed to create dir:", err)
+			return
+		}
+	}
 
-	fmt.Print("Enter your github.com account name: ")
-	account, _ := reader.ReadString('\n')
-	account = strings.TrimSpace(account)
+	os.Remove("main.go")
+	os.Remove("go.mod")
+	os.Remove("go.sum")
+	os.Remove("readme.md")
 
-	fmt.Print("Enter your project's name: ")
-	project, _ := reader.ReadString('\n')
-	project = strings.TrimSpace(project)
-	project = fmt.Sprintf("github.com/%s/%s", account, project)
+	fmt.Print("Use Fiber? [Y/n]: ")
+	fiber, _ := reader.ReadString('\n')
+	fiber = strings.TrimSpace(fiber)
 
-	cmd := exec.Command("go", "mod", "init", project)
+	if fiber == "n" {
+		err = copy.Copy("./code/vanilla", folder)
+		if err != nil {
+			fmt.Println("Dir contains files:", err)
+		}
+	} else {
+		err = copy.Copy("./code/fiber", folder)
+		if err != nil {
+			fmt.Println("Dir contains files:", err)
+		}
+	}
+
+	os.RemoveAll("./code")
+
+	os.Chdir(folder)
+
+	fmt.Print("Give a name to your Go module (Goact): ")
+	module, _ := reader.ReadString('\n')
+	module = strings.TrimSpace(module)
+
+	var cmd *exec.Cmd
+	if module == "" {
+		cmd = exec.Command("go", "mod", "init", "Goact")
+	} else {
+		cmd = exec.Command("go", "mod", "init", module)
+	}
+	cmd.Run()
+
+	cmd = exec.Command("go", "mod", "tidy")
+	cmd.Run()
+
+	//FRONTEND
+	fmt.Print("JS package manager (NPM/pnpm/bun): ")
+	pm, _ := reader.ReadString('\n')
+	pm = strings.TrimSpace(pm)
+	if pm != "pnpm" && pm != "bun" {
+		pm = "npm"
+	}
+
+	cmd = exec.Command(pm, "create", "vite@latest", "client", "--template", "react-ts")
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println("Failed to create go.mod:", err)
+		fmt.Println("Error creating vite application:", err)
 		return
 	}
 
-	fmt.Println("Go module setup:", project)
-	cmd = exec.Command("go", "get", "github.com/joho/godotenv")
-	if err := cmd.Run(); err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	os.Mkdir("./server", 0755)
-	fmt.Println("\nYou can choose fiber as a simpler way to setup your backend, if you want the standard library write n")
-	fmt.Print("Use Fiber? [Y/n]: ")
-	useFiber, _ := reader.ReadString('\n')
-	useFiber = strings.TrimSpace(useFiber)
-	if useFiber != "n" {
-		cmd = exec.Command("go", "get", "github.com/gofiber/fiber/v2")
-		if err = cmd.Run(); err != nil {
-			fmt.Println("Failed to install Fiber: ", err)
-		}
-		handlersFile := `package server
-
-import (
-		"github.com/gofiber/fiber/v2"
-)
-
-func HandleHello(c *fiber.Ctx) error {
-		return c.JSON(fiber.Map{"message": "hello!"})
-}`
-
-		os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
-
-		mainFile := fmt.Sprintf(`package main
-
-import (
-		"log"
-
-		"%s/server"
-
-		"github.com/joho/godotenv"
-		"github.com/gofiber/fiber/v2"
-		"github.com/gofiber/fiber/v2/middleware/cors"
-)
-
-func main() {
-		godotenv.Load(".env")
-
-		app := fiber.New()
-
-		//handle frontend routes
-		app.Static("/", "./client/dist")
-
-		api := app.Group("/api", cors.New(cors.Config{
-			AllowOrigins: "http://localhost:3000", //change this later
-			AllowMethods: "GET,POST,PUT,PATCH,DELETE",
-		}))
-		api.Get("/hello", server.HandleHello)
-
-		log.Fatal(app.Listen(":3000"))
-}
-`, project)
-		os.WriteFile("./main.go", []byte(mainFile), 0644)
-	} else {
-		handlersFile := `//Example code
-package server
-
-import (
-		"net/http"
-		"encoding/json"
-)
-
-func ApiRoutes() {
-		http.HandleFunc("/api/hello", handleHello)
-}
-
-type HelloResponse struct {
-		Message string ` + "`json:`" + `"message"` + `
-}
-
-func handleHello(w http.ResponseWriter, r *http.Request) {
-		response := HelloResponse{Message: "Hello, World!"}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(200)
-		json.NewEncoder(w).Encode(response)
-}`
-		os.WriteFile("./server/handlers.go", []byte(handlersFile), 0644)
-
-		mainFile := fmt.Sprintf(`package main
-
-import (
-		"log"
-		"os"
-		"net/http"
-		"fmt"
-
-		"%s/server"
-		"github.com/joho/godotenv"
-)
-
-func main () {
-		godotenv.Load(".env")
-
-		//handle frontend routes
-		fs := http.FileServer(http.Dir("./client/dist/"))
-		http.Handle("/", fs)
-
-		server.ApiRoutes()
-
-		port := os.Getenv("PORT")
-		if port == "" {
-			port = ":3000"
-		}
-		fmt.Println("Server running on port", port)
-		fmt.Println("http://localhost:3000 - go to /api/hello to test the Go API")
-		log.Fatal(http.ListenAndServe(port, nil))
-}`, project)
-		os.WriteFile("./main.go", []byte(mainFile), 0644)
-	}
-
-	os.Mkdir("./client", 0755)
-	cmd = exec.Command("npm", "create", "vite@latest", ".", "--", "--template", "react-ts", "-y")
-	cmd.Dir = "./client"
-	if err := cmd.Run(); err != nil {
-		fmt.Println("Failed to create Vite project:", err)
+	if _, err := os.Stat("client"); os.IsNotExist(err) {
+		fmt.Println("Client directory was not created successfully")
 		return
 	}
 
-	fmt.Println("\nFRONTEND SETUP")
-	os.Remove("./client/src/App.tsx")
-	os.RemoveAll("./client/src/assets")
-	os.Remove("./client/src/App.css")
-	os.RemoveAll("./client/public")
-	fmt.Printf("Use React Router? (Y/n): ")
-	useRR, _ := reader.ReadString('\n')
-	useRR = strings.TrimSpace(useRR)
-
-	if useRR == "n" {
-		os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-   <h1 className="text-2xl">Hello from Goact!</h1>
-  </StrictMode>,
-)`), 0644)
-	} else {
-		cmd = exec.Command("npm", "install", "react-router")
-		cmd.Dir = "./client"
-		if err := cmd.Run(); err != nil {
-			fmt.Println("Failed to install React Router:", err)
-		}
-
-		os.WriteFile("./client/src/main.tsx", []byte(`import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import { BrowserRouter, Link, Outlet, Route, Routes } from 'react-router'
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={
-          <div className='flex h-screen'>
-            <aside className='h-full w-56 bg-zinc-900 text-white'>
-              <nav className='flex flex-col gap-1.5 p-2 text-lg'>
-                <Link to="/" className='w-full cursor-pointer hover:bg-zinc-700 rounded bg-zinc-800 p-1.5'>Home</Link>
-                <Link to="/about" className='w-full cursor-pointer hover:bg-zinc-700 rounded bg-zinc-800 p-1.5'>About</Link>
-                <Link to="/usage" className='w-full cursor-pointer hover:bg-zinc-700 rounded bg-zinc-800 p-1.5'>Usage</Link>
-              </nav>
-            </aside>
-            <Outlet />
-          </div>}>
-          <Route index element={<main className='bg-zinc-700 flex-1 text-white flex flex-col items-center pt-16'><h1 className='text-6xl font-extrabold'>Home</h1></main>} />
-          <Route path="/about" element={<main className='bg-zinc-700 flex-1 text-white flex flex-col items-center pt-16'><h1 className='text-6xl font-extrabold'>About</h1></main>} />
-          <Route path="/usage" element={<main className='bg-zinc-700 flex-1 text-white flex flex-col items-center pt-16'><h1 className='text-6xl font-extrabold'>Usage</h1></main>} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  </StrictMode>,
-  )`), 0644)
+	err = os.Chdir("client")
+	if err != nil {
+		fmt.Println("Error changing to client directory:", err)
+		return
 	}
 
-	fmt.Printf("Use Tailwind? (Y/n): ")
-	useTailwind, _ := reader.ReadString('\n')
-	useTailwind = strings.TrimSpace(useTailwind)
+	fmt.Print("Use React Router? [Y/n]: ")
+	rr, _ := reader.ReadString('\n')
+	rr = strings.TrimSpace(rr)
 
-	if useTailwind != "n" {
-		cmd = exec.Command("npm", "install", "tailwindcss", "autoprefixer", "postcss")
-		cmd.Dir = "./client"
-		if err := cmd.Run(); err != nil {
-			fmt.Println("Failed to install Tailwind:", err)
-		}
-		cmd = exec.Command("npx", "tailwindcss", "init")
-		cmd.Dir = "./client"
-		if err := cmd.Run(); err != nil {
-			fmt.Println("Failed to init Tailwind:", err)
+	if rr != "n" {
+		cmd = exec.Command(pm, "i", "react-router@latest")
+		cmd.Run()
+	}
+
+	fmt.Print("Use Tailwind? [Y/n]: ")
+	tailwind, _ := reader.ReadString('\n')
+	tailwind = strings.TrimSpace(tailwind)
+
+	if tailwind != "n" {
+		cmd = exec.Command(pm, "i", "-D", "tailwindcss", "autoprefixer", "postcss")
+		cmd.Run()
+
+		if pm == "npm" {
+			cmd = exec.Command("npx", "tailwindcss", "init")
+		} else if pm == "pnpm" {
+			cmd = exec.Command("pnpm", "dlx", "tailwindcss", "init")
+		} else if pm == "bun" {
+			cmd = exec.Command("bunx", "tailwindcss", "init")
 		}
 
-		tailwindConfig := `/** @type {import('tailwindcss').Config} */
+		os.Remove("./src/App.css")
+
+		os.WriteFile("./postcss.config.js", []byte(`export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  }
+}`), 0644)
+
+		os.WriteFile("./src/index.css", []byte(`@tailwind base;
+@tailwind components;
+@tailwind utilities;
+`), 0644)
+
+		os.WriteFile("./tailwind.config.js", []byte(`/** @type {import('tailwindcss').Config} */
 export default {
   content: [
     "./index.html",
@@ -264,26 +145,36 @@ export default {
     extend: {},
   },
   plugins: [],
-}`
-		os.WriteFile("./client/tailwind.config.js", []byte(tailwindConfig), 0644)
+}`), 0644)
 
-		postcssConfig := `export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}`
-		os.WriteFile("./client/postcss.config.js", []byte(postcssConfig), 0644)
-
-		indexCSS := `@tailwind base;
-@tailwind components;
-@tailwind utilities;`
-		os.WriteFile("./client/src/index.css", []byte(indexCSS), 0644)
-	} else {
-		os.WriteFile("./client/src/index.css", []byte(``), 0644)
+		os.WriteFile("./src/App.tsx", []byte(`export default function App() {
+  return (
+    <>
+      <h1 className="text-2xl">Hello from Goact!</h1>
+    </>
+  );
+}`), 0644)
 	}
 
-	viteConfig := `import { defineConfig } from 'vite'
+	if rr != "n" {
+		os.WriteFile("./src/main.tsx", []byte(`import { createRoot } from "react-dom/client"
+import "./index.css"
+import App from "./App.tsx"
+import { BrowserRouter, Route } from "react-router"
+import { Routes } from "react-router"
+
+createRoot(document.getElementById("root")!).render(
+  <BrowserRouter>
+    <Routes>
+      <Route index element={<App />} />
+    </Routes>
+  </BrowserRouter>,
+)`), 0644)
+	}
+
+	os.Remove("./README.md")
+
+	os.WriteFile("./vite.config.ts", []byte(`import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
@@ -296,16 +187,15 @@ export default defineConfig({
       }
     }
   }
-})`
+})`), 0644)
 
-	os.WriteFile("./client/vite.config.ts", []byte(viteConfig), 0644)
+	fmt.Println("All Done!")
+	if folder != "." {
+		fmt.Printf("Use `cd %s` to find your project\n", folder)
+	}
+	fmt.Println("Save go files to fix undefined errors")
+	fmt.Print("\n")
 
-	fmt.Println("\nSetup complete!")
-	fmt.Println("\nNext steps:")
-	fmt.Printf("1. cd %s/client && npm install\n", folder)
+	fmt.Println("Happy Coding!")
 
-	fmt.Println("2. Run Golang dev mode with `air` or `go run .`")
-	fmt.Println("3. And run Vite dev mode with `cd client && npm run dev`")
-
-	fmt.Println("Happy coding!")
 }

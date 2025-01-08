@@ -30,14 +30,16 @@ func main() {
 		}
 	}
 
-	os.Remove("main.go")
-	os.Remove("go.mod")
-	os.Remove("go.sum")
-	os.Remove("readme.md")
-
 	fmt.Print("Use Fiber? [Y/n]: ")
 	fiber, _ := reader.ReadString('\n')
 	fiber = strings.TrimSpace(fiber)
+
+	if folder == "." {
+		os.Remove("main.go")
+		os.Remove("go.mod")
+		os.Remove("go.sum")
+		os.Remove("readme.md")
+	}
 
 	if fiber == "n" {
 		err = copy.Copy("./code/vanilla", folder)

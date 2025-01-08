@@ -22,9 +22,7 @@ func main() {
 		folder = os.Args[1]
 	}
 
-	err := os.Mkdir(folder, 0755)
-	if err != nil {
-	}
+	os.Mkdir(folder, 0755)
 
 	fmt.Print("Use Fiber? [Y/n]: ")
 	fiber, _ := reader.ReadString('\n')
@@ -37,6 +35,7 @@ func main() {
 		os.Remove("readme.md")
 	}
 
+	var err error
 	if fiber == "n" {
 		err = copy.Copy("./code/vanilla", folder)
 		if err != nil {
